@@ -164,9 +164,8 @@ class MainActivity : ComponentActivity() {
             Text("Input Baud rate here")
           },
           onValueChange = { newText ->
-            if (newText.all { it.isDigit() }) {
-              baudRate = newText.toInt()
-            }
+            baudRate =
+              newText.takeIf { it.isNotEmpty() && it.all { char -> char.isDigit() } }?.toInt()
           },
           keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
           visualTransformation = VisualTransformation.None,
