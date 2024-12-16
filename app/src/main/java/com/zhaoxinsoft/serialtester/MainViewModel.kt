@@ -9,7 +9,11 @@ class MainViewModel : ViewModel() {
   val isConnected = mutableStateOf(false)
   val selectedDevice = mutableStateOf<String?>(null)
   val baudRate = mutableStateOf<Number?>(9600)
+  val dataBits = mutableStateOf<Number?>(8)
+  val parity = mutableStateOf<Number?>(0)
+  val stopBits = mutableStateOf<Number?>(1)
   val data = mutableStateOf<String?>("01 03 00 02 00 01 25 CA")
   val hexMode = mutableStateOf(true)
+  val echoMode = mutableStateOf(true)
   val receivedData = mutableStateListOf<String>()
 }

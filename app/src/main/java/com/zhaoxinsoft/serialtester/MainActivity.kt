@@ -9,22 +9,23 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Done
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -44,6 +45,9 @@ import com.fazecast.jSerialComm.SerialPort
 import com.fazecast.jSerialComm.SerialPortDataListener
 import com.fazecast.jSerialComm.SerialPortEvent
 import com.zhaoxinsoft.serialtester.ui.theme.SerialTesterTheme
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
   private val viewModel: MainViewModel by viewModels()
@@ -73,9 +77,9 @@ class MainActivity : ComponentActivity() {
     try {
       serialPort?.closePort()
       serialPort = SerialPort.getCommPort(viewModel.selectedDevice.value)
-      serialPort?.numDataBits = 8
-      serialPort?.parity = SerialPort.NO_PARITY
-      serialPort?.numStopBits = 1
+      serialPort?.numDataBits = viewModel.dataBits.value?.toInt() ?: 8
+      serialPort?.parity = viewModel.parity.value?.toInt() ?: SerialPort.NO_PARITY
+      serialPort?.numStopBits = viewModel.stopBits.value?.toInt() ?: SerialPort.ONE_STOP_BIT
       serialPort?.baudRate = viewModel.baudRate.value?.toInt() ?: 9600
       serialPort?.addDataListener(object : SerialPortDataListener {
         override fun getListeningEvents(): Int {
@@ -90,7 +94,8 @@ class MainActivity : ComponentActivity() {
           } else {
             newData.toString(Charsets.UTF_8)
           }
-          viewModel.receivedData.add(str)
+          val timestamp = SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault()).format(Date())
+          viewModel.receivedData.add("[$timestamp] RX: $str")
           Log.d("M", "Received data: $str")
         }
       })
@@ -114,8 +119,12 @@ class MainActivity : ComponentActivity() {
     }
     if (data != null) {
       if (data.isEmpty()) return
-      serialPort?.writeBytes(data, data.size.toLong())
+      val sent = serialPort?.writeBytes(data, data.size.toLong())
       Log.d("M", "Sent data: ${data.joinToString(" ") { String.format("%02X", it) }}")
+      if (sent == data.size) {
+        val timestamp = SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault()).format(Date())
+        viewModel.receivedData.add("[$timestamp] TX: ${viewModel.data.value}")
+      }
     }
   }
 
@@ -139,29 +148,32 @@ class MainActivity : ComponentActivity() {
     }
   }
 
+  @OptIn(ExperimentalLayoutApi::class)
   @Composable
   fun HomeScreen(viewModel: MainViewModel) {
     Column(
-      modifier = Modifier.padding(horizontal = 8.dp)
+      modifier = Modifier.padding(8.dp)
     ) {
       val selectedDevice by viewModel.selectedDevice
-      DeviceSelector(
-        devices = viewModel.availablePorts.filterNotNull(), onDeviceSelected = {
-          viewModel.selectedDevice.value = it
-        }, enabled = !viewModel.isConnected.value, selectedDevice = selectedDevice
-      )
-      Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        var baudRate by viewModel.baudRate
+      var baudRate by viewModel.baudRate
+      FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+      ) {
+        DropDownList(
+          modifier = Modifier.width(180.dp),
+          values = viewModel.availablePorts.filterNotNull(),
+          label = "Devices",
+          selectedValue = selectedDevice,
+          enabled = !viewModel.isConnected.value,
+          onItemSelected = {
+            viewModel.selectedDevice.value = it
+          })
         TextField(
-          modifier = Modifier
-            .weight(1f)
-            .padding(end = 8.dp),
+          modifier = Modifier.width(150.dp),
           value = baudRate?.toString() ?: "",
           label = {
             Text("Baud rate")
-          },
-          placeholder = {
-            Text("Input Baud rate here")
           },
           onValueChange = { newText ->
             baudRate =
@@ -171,10 +183,48 @@ class MainActivity : ComponentActivity() {
           visualTransformation = VisualTransformation.None,
           enabled = !viewModel.isConnected.value
         )
-        Text(text = "Hex mode")
-        Checkbox(checked = viewModel.hexMode.value, onCheckedChange = {
-          viewModel.hexMode.value = it
-        })
+        DropDownList(
+          values = listOf("8", "7"),
+          selectedValue = viewModel.dataBits.value?.toString() ?: "8",
+          label = "Data bits",
+          enabled = !viewModel.isConnected.value,
+          modifier = Modifier.width(150.dp),
+          onItemSelected = {
+            viewModel.dataBits.value = it.toInt()
+          }
+        )
+        DropDownList(
+          modifier = Modifier.width(120.dp),
+          values = listOf("0", "1", "2", "3", "4"),
+          selectedValue = viewModel.parity.value?.toString() ?: "0",
+          label = "Parity",
+          enabled = !viewModel.isConnected.value,
+          items = listOf("None", "Odd", "Even", "Mark", "Space"),
+          onItemSelected = {
+            viewModel.parity.value = it.toInt()
+          }
+        )
+        DropDownList(
+          modifier = Modifier.width(150.dp),
+          values = listOf("1", "2", "3"),
+          selectedValue = viewModel.stopBits.value?.toString() ?: "1",
+          label = "Stop bits",
+          enabled = !viewModel.isConnected.value,
+          items = listOf("1", "1.5", "2"),
+          onItemSelected = {
+            viewModel.stopBits.value = it.toInt()
+          },
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          Text(text = "Hex")
+          Checkbox(checked = viewModel.hexMode.value, onCheckedChange = {
+            viewModel.hexMode.value = it
+          })
+          Text(text = "Echo")
+          Checkbox(checked = viewModel.echoMode.value, onCheckedChange = {
+            viewModel.echoMode.value = it
+          })
+        }
         if (viewModel.isConnected.value) {
           Button(onClick = { disconnect() }) {
             Text("Disconnect")
@@ -216,37 +266,46 @@ class MainActivity : ComponentActivity() {
 
   @OptIn(ExperimentalMaterial3Api::class)
   @Composable
-  fun DeviceSelector(
-    devices: List<String>,
-    selectedDevice: String? = null,
-    enabled: Boolean = true,
-    onDeviceSelected: (String) -> Unit
+  fun DropDownList(
+    values: List<String>,
+    selectedValue: String?,
+    modifier: Modifier = Modifier,
+    items: List<String>? = null,
+    label: String? = null,
+    enabled: Boolean? = true,
+    onItemSelected: (String) -> Unit
   ) {
-    var selected by rememberSaveable { mutableStateOf(selectedDevice) }
-    LazyVerticalGrid(
-      columns = GridCells.Fixed(2), modifier = Modifier.fillMaxWidth(),
+    var expanded by rememberSaveable { mutableStateOf(false) }
+
+    ExposedDropdownMenuBox(
+      expanded = expanded,
+      onExpandedChange = { if (enabled == true) expanded = !expanded },
+      modifier = modifier,
     ) {
-      items(devices) { device ->
-        FilterChip(
-          modifier = Modifier.padding(horizontal = 8.dp),
-          onClick = { selected = device; onDeviceSelected(device) },
-          label = {
-            Text(device)
-          },
-          selected = selected == device,
-          enabled = enabled,
-          leadingIcon = if (selected == device) {
-            {
-              Icon(
-                imageVector = Icons.Filled.Done,
-                contentDescription = "Done icon",
-                modifier = Modifier.size(24.dp)
-              )
+      TextField(
+        value = if (selectedValue != null) values.indexOf(selectedValue)
+          .let { items?.getOrNull(it) }
+          ?: selectedValue else "",
+        onValueChange = {},
+        enabled = enabled == true,
+        readOnly = true,
+        label = { if (label != null) Text(label) },
+        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+        modifier = Modifier.menuAnchor()
+      )
+      ExposedDropdownMenu(
+        expanded = expanded,
+        onDismissRequest = { expanded = false }
+      ) {
+        values.forEachIndexed { i, item ->
+          DropdownMenuItem(
+            text = { Text(items?.get(i) ?: item) },
+            onClick = {
+              onItemSelected(item)
+              expanded = false
             }
-          } else {
-            null
-          },
-        )
+          )
+        }
       }
     }
   }
