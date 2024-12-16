@@ -7,11 +7,14 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -27,9 +30,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,6 +44,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
@@ -148,117 +156,145 @@ class MainActivity : ComponentActivity() {
     }
   }
 
-  @OptIn(ExperimentalLayoutApi::class)
+  @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
   @Composable
   fun HomeScreen(viewModel: MainViewModel) {
-    Column(
-      modifier = Modifier.padding(8.dp)
-    ) {
-      val selectedDevice by viewModel.selectedDevice
-      var baudRate by viewModel.baudRate
-      FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+    Scaffold(topBar = {
+      TopAppBar(colors = topAppBarColors(
+        containerColor = MaterialTheme.colorScheme.primaryContainer,
+        titleContentColor = MaterialTheme.colorScheme.primary,
+      ), title = { Text("Serial Port Tester") })
+    }) { pd ->
+      Column(
+        modifier = Modifier
+          .padding(
+            top = pd.calculateTopPadding() + 8.dp,
+            bottom = pd.calculateBottomPadding() + 8.dp,
+            start = pd.calculateStartPadding(LocalLayoutDirection.current) + 8.dp,
+            end = pd.calculateEndPadding(LocalLayoutDirection.current) + 8.dp
+          )
       ) {
-        DropDownList(
-          modifier = Modifier.width(180.dp),
-          values = viewModel.availablePorts.filterNotNull(),
-          label = "Devices",
-          selectedValue = selectedDevice,
-          enabled = !viewModel.isConnected.value,
-          onItemSelected = {
-            viewModel.selectedDevice.value = it
-          })
-        TextField(
-          modifier = Modifier.width(150.dp),
-          value = baudRate?.toString() ?: "",
-          label = {
-            Text("Baud rate")
-          },
-          onValueChange = { newText ->
-            baudRate =
-              newText.takeIf { it.isNotEmpty() && it.all { char -> char.isDigit() } }?.toInt()
-          },
-          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-          visualTransformation = VisualTransformation.None,
-          enabled = !viewModel.isConnected.value
-        )
-        DropDownList(
-          values = listOf("8", "7"),
-          selectedValue = viewModel.dataBits.value?.toString() ?: "8",
-          label = "Data bits",
-          enabled = !viewModel.isConnected.value,
-          modifier = Modifier.width(150.dp),
-          onItemSelected = {
-            viewModel.dataBits.value = it.toInt()
+        val selectedDevice by viewModel.selectedDevice
+        var baudRate by viewModel.baudRate
+        FlowRow(
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+          verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+          DropDownList(
+            modifier = Modifier.width(180.dp),
+            values = viewModel.availablePorts.filterNotNull(),
+            label = "Devices",
+            selectedValue = selectedDevice,
+            enabled = !viewModel.isConnected.value,
+            onItemSelected = {
+              viewModel.selectedDevice.value = it
+            })
+          TextField(
+            modifier = Modifier.width(150.dp),
+            value = baudRate?.toString() ?: "",
+            label = {
+              Text("Baud rate")
+            },
+            onValueChange = { newText ->
+              baudRate =
+                newText.takeIf { it.isNotEmpty() && it.all { char -> char.isDigit() } }?.toInt()
+            },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            visualTransformation = VisualTransformation.None,
+            enabled = !viewModel.isConnected.value
+          )
+          DropDownList(
+            values = listOf("8", "7"),
+            selectedValue = viewModel.dataBits.value?.toString() ?: "8",
+            label = "Data bits",
+            enabled = !viewModel.isConnected.value,
+            modifier = Modifier.width(150.dp),
+            onItemSelected = {
+              viewModel.dataBits.value = it.toInt()
+            }
+          )
+          DropDownList(
+            modifier = Modifier.width(120.dp),
+            values = listOf("0", "1", "2", "3", "4"),
+            selectedValue = viewModel.parity.value?.toString() ?: "0",
+            label = "Parity",
+            enabled = !viewModel.isConnected.value,
+            items = listOf("None", "Odd", "Even", "Mark", "Space"),
+            onItemSelected = {
+              viewModel.parity.value = it.toInt()
+            }
+          )
+          DropDownList(
+            modifier = Modifier.width(150.dp),
+            values = listOf("1", "2", "3"),
+            selectedValue = viewModel.stopBits.value?.toString() ?: "1",
+            label = "Stop bits",
+            enabled = !viewModel.isConnected.value,
+            items = listOf("1", "1.5", "2"),
+            onItemSelected = {
+              viewModel.stopBits.value = it.toInt()
+            },
+          )
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(text = "Hex", modifier = Modifier.clickable {
+              viewModel.hexMode.value = !viewModel.hexMode.value
+            })
+            Checkbox(checked = viewModel.hexMode.value, onCheckedChange = {
+              viewModel.hexMode.value = it
+            })
+            Text(text = "Echo", modifier = Modifier.clickable {
+              viewModel.echoMode.value = !viewModel.echoMode.value
+            })
+            Checkbox(checked = viewModel.echoMode.value, onCheckedChange = {
+              viewModel.echoMode.value = it
+            })
           }
-        )
-        DropDownList(
-          modifier = Modifier.width(120.dp),
-          values = listOf("0", "1", "2", "3", "4"),
-          selectedValue = viewModel.parity.value?.toString() ?: "0",
-          label = "Parity",
-          enabled = !viewModel.isConnected.value,
-          items = listOf("None", "Odd", "Even", "Mark", "Space"),
-          onItemSelected = {
-            viewModel.parity.value = it.toInt()
+          if (viewModel.isConnected.value) {
+            OutlinedButton(onClick = { disconnect() }) {
+              Text("Disconnect")
+            }
+          } else {
+            Button(enabled = selectedDevice != null && baudRate != null, onClick = {
+              connect()
+            }) {
+              Text("Connect")
+            }
           }
-        )
-        DropDownList(
-          modifier = Modifier.width(150.dp),
-          values = listOf("1", "2", "3"),
-          selectedValue = viewModel.stopBits.value?.toString() ?: "1",
-          label = "Stop bits",
-          enabled = !viewModel.isConnected.value,
-          items = listOf("1", "1.5", "2"),
-          onItemSelected = {
-            viewModel.stopBits.value = it.toInt()
-          },
-        )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-          Text(text = "Hex")
-          Checkbox(checked = viewModel.hexMode.value, onCheckedChange = {
-            viewModel.hexMode.value = it
-          })
-          Text(text = "Echo")
-          Checkbox(checked = viewModel.echoMode.value, onCheckedChange = {
-            viewModel.echoMode.value = it
-          })
         }
         if (viewModel.isConnected.value) {
-          Button(onClick = { disconnect() }) {
-            Text("Disconnect")
-          }
-        } else {
-          Button(enabled = selectedDevice != null && baudRate != null, onClick = {
-            connect()
-          }) {
-            Text("Connect")
-          }
-        }
-      }
-      if (viewModel.isConnected.value) {
-        TextField(modifier = Modifier.fillMaxWidth(), value = viewModel.data.value ?: "", label = {
-          Text("Send data")
-        }, placeholder = {
-          Text("Input data to send")
-        }, onValueChange = { newText ->
-          viewModel.data.value = newText
-        })
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-          Button(onClick = { clear() }) {
-            Text("Clear")
-          }
-          Button(enabled = viewModel.data.value?.isNotEmpty() == true, onClick = { send() }) {
-            Text("Send")
+          TextField(
+            modifier = Modifier.fillMaxWidth(),
+            value = viewModel.data.value ?: "",
+            label = {
+              Text("Send data")
+            },
+            placeholder = {
+              Text("Input data to send")
+            },
+            onValueChange = { newText ->
+              viewModel.data.value = newText
+            })
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+          ) {
+            OutlinedButton(onClick = { clear() }) {
+              Text("Clear")
+            }
+            Button(enabled = viewModel.data.value?.isNotEmpty() == true, onClick = { send() }) {
+              Text("Send")
+            }
           }
         }
-      }
-      LazyVerticalGrid(
-        columns = GridCells.Fixed(1), modifier = Modifier.fillMaxWidth(),
-      ) {
-        items(viewModel.receivedData) { data ->
-          Text(data)
+        LazyVerticalGrid(
+          columns = GridCells.Fixed(1), modifier = Modifier.fillMaxWidth(),
+        ) {
+          item {
+            // put static item here
+          }
+          items(viewModel.receivedData) { data ->
+            Text(data)
+          }
         }
       }
     }
