@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -40,6 +41,7 @@ import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -53,6 +55,7 @@ import com.fazecast.jSerialComm.SerialPort
 import com.fazecast.jSerialComm.SerialPortDataListener
 import com.fazecast.jSerialComm.SerialPortEvent
 import com.zhaoxinsoft.serialtester.ui.theme.SerialTesterTheme
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -100,7 +103,7 @@ class MainActivity : ComponentActivity() {
           val str = if (viewModel.hexMode.value) {
             newData.joinToString(" ") { String.format("%02X", it) }
           } else {
-            newData.toString(Charsets.UTF_8)
+            newData.toString(Charsets.UTF_8).trimEnd()
           }
           val timestamp = SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault()).format(Date())
           viewModel.receivedData.add("[$timestamp] RX: $str")
@@ -139,12 +142,10 @@ class MainActivity : ComponentActivity() {
   private fun disconnect() {
     serialPort?.closePort()
     serialPort?.removeDataListener()
-    viewModel.receivedData.clear()
     viewModel.isConnected.value = false
   }
 
   private fun clear() {
-//    viewModel.data.value = null
     viewModel.receivedData.clear()
   }
 
@@ -285,15 +286,25 @@ class MainActivity : ComponentActivity() {
               Text("Send")
             }
           }
+        } else if (viewModel.receivedData.isNotEmpty()) {
+          OutlinedButton(onClick = { clear() }) {
+            Text("Clear")
+          }
         }
+        val lazyGridState = rememberLazyGridState()
+        val coroutineScope = rememberCoroutineScope()
         LazyVerticalGrid(
-          columns = GridCells.Fixed(1), modifier = Modifier.fillMaxWidth(),
+          columns = GridCells.Fixed(1), modifier = Modifier.fillMaxWidth(), state = lazyGridState
         ) {
           item {
             // put static item here
           }
           items(viewModel.receivedData) { data ->
             Text(data)
+          }
+          coroutineScope.launch {
+            if (viewModel.receivedData.isNotEmpty())
+              lazyGridState.scrollToItem(viewModel.receivedData.size - 1)
           }
         }
       }

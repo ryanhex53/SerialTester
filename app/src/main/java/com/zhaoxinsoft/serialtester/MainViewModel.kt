@@ -6,7 +6,7 @@ import androidx.lifecycle.ViewModel
 
 class MainViewModel : ViewModel() {
   val availablePorts = mutableListOf<String?>(null)
-  val isConnected = mutableStateOf(true)
+  val isConnected = mutableStateOf(false)
   val selectedDevice = mutableStateOf<String?>(null)
   val baudRate = mutableStateOf<Number?>(9600)
   val dataBits = mutableStateOf<Number?>(8)
